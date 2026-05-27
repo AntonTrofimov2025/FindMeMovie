@@ -1,2 +1,2 @@
 # FindMeMovie
-You wanna watch something special and dunno what exactly? Then you're at the right place :)
+You wanna watch something special and dunno what exactly? You're at the right place then :)
