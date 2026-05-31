@@ -1,24 +1,127 @@
 import sys
+from sql import *
+from datetime import datetime
 
-def ui_config(db_object):
+class User:
+    def __init__(self, db_object, mong_object):
+        self.db = db_object
+        self.mymongo = mong_object.my_queries_db
+
+    def print_found_movies(self, movies_found):
+        while movies_found:
+            for movies in movies_found:
+                print(f"{movies['num']}. {movies['title']}, release year: {movies['release_year']},"
+                      f" language: {movies['lang_name']}, genre: {movies['genre_name']}, duration:"
+                      f" {movies['length']}m, rating: {movies['rating']}")
+            length = len(movies_found)
+            if length < 10:
+                print(f"Last {length} movies have been shown" if length > 1 else "Last movie has been shown")
+                break
+            movies_found = self.db.cursor.fetchmany(10)
+            if movies_found:
+                input("Press ENTER to show next 10 movies...")
+            else:
+                print("No more movies found.")
+
+    def find_movie_by_year_genre(self):
+        self.db.cursor.execute(film_genres)
+        print("Available genres: ")
+        for i, genre in enumerate(self.db.cursor, 1):
+            if not i % 6:
+                print(genre['name'], end=",\n")
+            else:
+                print(genre['name'], end=', ')
+        self.db.cursor.execute(min_max_years)
+        years = self.db.cursor.fetchone()
+        print(f"Min year in db: {years['min_year']}, Max year in db: {years['max_year']}")
+        which_genre = input("Enter preferred genre: ").lower().title()
+        print("Please enter release years below.")
+        while True:
+            try:
+                year_from = int(input("Starting from year: "))
+                break
+            except ValueError:
+                print("Use numbers only!!")
+        while True:
+            try:
+                year_to = int(input("... to year (Inclusive): "))
+                break
+            except ValueError:
+                print("Use numbers only!!")
+        self.mymongo.insert_one({"timestamp": datetime.now(), "genre": which_genre, "popular years": f"{year_from}, {year_to}"})
+        self.db.cursor.execute(movie_by_genre_and_year, (which_genre, year_from, year_to))
+        movies_found = self.db.cursor.fetchmany(10)
+        if movies_found:
+            self.print_found_movies(movies_found)
+            return
+        else:
+            print("No movie was found, we're sorry.")
+            return
+
+    def find_movie_like(self):
+        which_movie = input("Please enter any movie's title: ").lower()
+        self.mymongo.insert_one({"timestamp": datetime.now(), "title": which_movie})
+        self.db.cursor.execute(movies_like, (f"%{which_movie}%", which_movie, f"{which_movie} %", f"% {which_movie}",
+                                            f"% {which_movie} %"))
+        movies_found = self.db.cursor.fetchmany(10)
+        if movies_found:
+            self.print_found_movies(movies_found)
+            return
+        else:
+            print("No movie was found, we're sorry.")
+            return
+
+    def show_top5_queries(self, by_title=False, by_genre = False):
+        choice = "title" if by_title else "genre" if by_genre else "popular years"
+        top5 = self.mymongo.aggregate([{"$match": {choice: {"$ne": "", "$exists": True}}},
+                                        {"$group": {"_id": f"${choice}", "count": {"$sum": 1}}},
+                                        {"$project": {"_id": 0, choice: "$_id", "count": 1}},
+                                        {"$sort": {"count": -1}}, {"$limit": 5}])
+        print(f"Top {choice}s: " if by_title or by_genre else f"Top {choice}: ",
+              *(f"{num}. {query[choice]} - {query['count']} times" for num, query in enumerate(top5, 1)), sep="\n")
+
+    def last_unique_queries(self):
+        top10_unique = self.mymongo.aggregate([{"$match": {"title": {"$ne": ""}, "genre": {"$ne": ""}}},
+                                               {"$group": {"_id": {"title": "$title", "genre": "$genre"},
+                                                "timestamp": {"$max": "$timestamp"}}}, {"$sort": {"timestamp": -1}},
+                                               {"$project": {"_id": 0, "title": "$_id.title", "genre": "$_id.genre",
+                                                "timestamp": 1}}, {"$limit": 10}])
+        print("Last 10 unique queries: ")
+        for query in top10_unique:
+            print(f"Title: {query.get('title', "N/A")}, Genre: {query.get('genre', "N/A")}, Date: {query['timestamp']}")
+
+    def how_many_movies_in_db(self):
+        print("All available movies, divided by genre: ")
+        self.db.cursor.execute(available_movies_per_genre)
+        print(*(f"{movies['name']}: {movies['count']}" for movies in self.db.cursor), sep='\n')
+        self.db.cursor.execute(total_movies)
+        total = self.db.cursor.fetchone()
+        print(f"Total: {total['total']}")
+
+def ui_config(db_object, mong_object):
+    user = User(db_object, mong_object)
     return {"title": "Main menu: ",
               "items": {
                   "1": {"text": "Поиск фильма по жанру и диапазону годов выпуска",
-                        "action": db_object.action1},
+                        "action": user.find_movie_by_year_genre},
                   "2": {"text": "Поиск фильма по названию",
-                        "action": db_object.find_movie_like},
-                  "3": {"text": "Most popular movie queries",
-                        "action": db_object.action3},
-                  "4": {"text": "sss",
+                        "action": user.find_movie_like},
+                  "3": {"text": "Most popular queries",
                       "submenu": {"title": "Submenu: ",
                                   "items": {
-                                      "1": {"text": "submenu1",
-                                            "action": db_object.action4},
-                                      "2": {"text": "submenu2",
-                                            "action": db_object.action5},
-                                      "3": {"text": "Back to Main menu",
+                                      "1": {"text": "TOP5 Most popular movies",
+                                            "action": lambda: user.show_top5_queries(by_title=True)},
+                                      "2": {"text": "TOP5 Most popular genres",
+                                            "action": lambda: user.show_top5_queries(by_genre=True)},
+                                      "3": {"text": "TOP5 Most popular years",
+                                            "action": user.show_top5_queries},
+                                      "4": {"text": "Last unique queries",
+                                            "action": user.last_unique_queries},
+                                      "5": {"text": "Back to Main menu",
                                             "action": 'back'}}
                   }},
+                  "4": {"text": "Show me all available in DB movies",
+                        "action": user.how_many_movies_in_db},
                   "5": {"text": "Exit",
                         "action": lambda: print("Bye Bye :)") or sys.exit(0)}
               }}
@@ -42,5 +145,3 @@ def show_menu(menu_config):
         else:
             print("Menu option not found.")
             input("Press ENTER to continue...")
-
-
