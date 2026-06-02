@@ -63,7 +63,7 @@ class User:
                     raise YearError(f"Maximal year in DB: {years['max_year']}. Please try again.")
                 break
             except ValueError:
-                print("Use numbers only!!")
+                print("Use integer numbers only!!")
             except YearError as e:
                 print(e)
         self.mymongo.insert_one({"timestamp": datetime.now(), "genre": which_genre, "popular years": f"{year_from}, {year_to}"})
@@ -112,33 +112,36 @@ class User:
         total = self.db.cursor.fetchone()
         print(f"Total: {total['total']}")
 
+def get_menu(user):
+    return {"title": "Main menu: ",
+                  "items": {
+                      "1": {"text": "Поиск фильма по жанру и диапазону годов выпуска",
+                            "action": user.find_movie_by_year_genre},
+                      "2": {"text": "Поиск фильма по названию",
+                            "action": user.find_movie_like},
+                      "3": {"text": "Most popular queries",
+                          "submenu": {"title": "Submenu: ",
+                                      "items": {
+                                          "1": {"text": "TOP5 Most popular movies",
+                                                "action": lambda: user.show_top5_queries(by_title=True)},
+                                          "2": {"text": "TOP5 Most popular genres",
+                                                "action": lambda: user.show_top5_queries(by_genre=True)},
+                                          "3": {"text": "TOP5 Most popular years",
+                                                "action": user.show_top5_queries},
+                                          "4": {"text": "Last unique queries",
+                                                "action": user.last_unique_queries},
+                                          "5": {"text": "Back to Main menu",
+                                                "action": 'back'}}
+                      }},
+                      "4": {"text": "Show me all available in DB movies",
+                            "action": user.how_many_movies_in_db},
+                      "5": {"text": "Exit",
+                            "action": lambda: print("Bye Bye :)") or sys.exit(0)}
+                  }}
+
 def ui_config(db_object, mong_object):
     user = User(db_object, mong_object)
-    return {"title": "Main menu: ",
-              "items": {
-                  "1": {"text": "Поиск фильма по жанру и диапазону годов выпуска",
-                        "action": user.find_movie_by_year_genre},
-                  "2": {"text": "Поиск фильма по названию",
-                        "action": user.find_movie_like},
-                  "3": {"text": "Most popular queries",
-                      "submenu": {"title": "Submenu: ",
-                                  "items": {
-                                      "1": {"text": "TOP5 Most popular movies",
-                                            "action": lambda: user.show_top5_queries(by_title=True)},
-                                      "2": {"text": "TOP5 Most popular genres",
-                                            "action": lambda: user.show_top5_queries(by_genre=True)},
-                                      "3": {"text": "TOP5 Most popular years",
-                                            "action": user.show_top5_queries},
-                                      "4": {"text": "Last unique queries",
-                                            "action": user.last_unique_queries},
-                                      "5": {"text": "Back to Main menu",
-                                            "action": 'back'}}
-                  }},
-                  "4": {"text": "Show me all available in DB movies",
-                        "action": user.how_many_movies_in_db},
-                  "5": {"text": "Exit",
-                        "action": lambda: print("Bye Bye :)") or sys.exit(0)}
-              }}
+    return get_menu(user)
 
 def show_menu(menu_config):
     stack = [menu_config]
