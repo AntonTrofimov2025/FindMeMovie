@@ -10,10 +10,10 @@ class User:
 
     def print_found_movies(self, movies_found, pagination=10):
         while movies_found:
-            for movies in movies_found:
-                print(f"{movies['num']}. {movies['title']}, release year: {movies['release_year']},"
-                      f" language: {movies['lang_name']}, genre: {movies['genre_name']}, duration:"
-                      f" {movies['length']}m, rating: {movies['rating']}")
+            for movie in movies_found:
+                print(f"{movie['num']}. {movie['title']}, release year: {movie['release_year']},"
+                      f" language: {movie['lang_name']}, genre: {movie['genre_name']}, duration:"
+                      f" {movie['length']}m, rating: {movie['rating']}")
             length = len(movies_found)
             if length < pagination:
                 print(f"Last {length} movies have been shown" if length > 1 else "Last movie has been shown")
@@ -107,7 +107,7 @@ class User:
     def how_many_movies_in_db(self):
         print("All available movies, divided by genre: ")
         self.db.cursor.execute(available_movies_per_genre)
-        print(*(f"{movies['name']}: {movies['count']}" for movies in self.db.cursor), sep='\n')
+        print(*(f"{movie['name']}: {movie['count']}" for movie in self.db.cursor), sep='\n')
         self.db.cursor.execute(total_movies)
         total = self.db.cursor.fetchone()
         print(f"Total: {total['total']}")
