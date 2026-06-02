@@ -13,12 +13,14 @@ from sql import (
 )
 from datetime import datetime
 from errors import YearError, GenreError, RatingError, ActorError
+from movie_logging import logger_decorator
 
 class User:
     def __init__(self, db_object, mong_object):
         self.db = db_object
         self.mymongo = mong_object.my_queries_db
 
+    @logger_decorator
     def print_found_movies(self, movies_found, pagination=10):
         while movies_found:
             for movie in movies_found:
@@ -36,6 +38,7 @@ class User:
                 print("No more movies found.")
 
     @staticmethod
+    @logger_decorator
     def print_names(all_names, key, key2="", line_length=6):
         for i, name in enumerate(all_names, 1):
             if not i % line_length:
@@ -44,6 +47,7 @@ class User:
                 print(name[key] + " " + name.get(key2, "") if key2 else name[key], end=', ')
         print()
 
+    @logger_decorator
     def find_movie_by_actor(self, pagination=10):
         self.db.cursor.execute(film_actors)
         all_actors = self.db.cursor.fetchall()
@@ -67,7 +71,7 @@ class User:
         else:
             print("No movie was found, we're sorry.")
 
-
+    @logger_decorator
     def find_movie_by_rating_genre(self, pagination=10):
         self.db.cursor.execute(film_genres)
         all_genres = self.db.cursor.fetchall()
@@ -103,6 +107,7 @@ class User:
         else:
             print("No movie was found, we're sorry.")
 
+    @logger_decorator
     def find_movie_by_year_genre(self, pagination=10):
         self.db.cursor.execute(film_genres)
         all_genres = self.db.cursor.fetchall()
@@ -136,6 +141,8 @@ class User:
                 year_to = int(input("... to year (Inclusive): "))
                 if year_to > years['max_year']:
                     raise YearError(f"Maximal year in DB: {years['max_year']}. Please try again.")
+                if year_to < year_from:
+                    raise YearError(f"End year cannot be less than start year ({year_from}). Please try again.")
                 break
             except ValueError:
                 print("Use integer numbers only!!")
@@ -149,6 +156,7 @@ class User:
         else:
             print("No movie was found, we're sorry.")
 
+    @logger_decorator
     def find_movie_like(self, pagination=10):
         which_movie = input("Please enter any movie's title: ").lower()
         self.mymongo.insert_one({"timestamp": datetime.now(), "title": which_movie})
@@ -160,6 +168,7 @@ class User:
         else:
             print("No movie was found, we're sorry.")
 
+    @logger_decorator
     def show_top5_queries(self, by_title=False, by_genre = False, by_rating = False, by_actor = False):
         choice = "title" if by_title else "genre" if by_genre else "rating" if by_rating else "actor"\
             if by_actor else "popular years"
@@ -171,6 +180,7 @@ class User:
         print(f"Top {choice}s: " if by_choice != "popular years" else f"Top {choice}: ",
               *(f"{num}. {query[choice]} - {query['count']} times" for num, query in enumerate(top5, 1)), sep="\n")
 
+    @logger_decorator
     def last_unique_queries(self):
         top10_unique = self.mymongo.aggregate(
             [{"$match": {"title": {"$ne": ""}, "genre": {"$ne": ""}, "rating": {"$ne": ""}, "actor": {"$ne": ""}}},
@@ -184,6 +194,7 @@ class User:
                 f" Main actor: {query.get('actor', 'N/A')}, Rating: {query.get('rating', 'N/A')},"
                   f" Date: {query['timestamp']}")
 
+    @logger_decorator
     def how_many_movies_in_db(self):
         print("All available movies, divided by genre: ")
         self.db.cursor.execute(available_movies_per_genre)
@@ -193,6 +204,7 @@ class User:
         total = self.db.cursor.fetchone()
         print(f"Total: {total['total']}")
 
+@logger_decorator
 def get_menu(user):
     return {"title": "Main menu: ",
             "items": {
@@ -237,10 +249,12 @@ def get_menu(user):
                     }
             }
 
+@logger_decorator
 def ui_config(db_object, mong_object):
     user = User(db_object, mong_object)
     return get_menu(user)
 
+@logger_decorator
 def show_menu(menu_config):
     stack = [menu_config]
     while stack:
