@@ -1,7 +1,18 @@
 import sys
-from sql import *
+from sql import (
+    movies_like,
+    movie_by_genre_and_year,
+    movie_by_genre_and_rating,
+    film_genres,
+    film_ratings,
+    min_max_years,
+    available_movies_per_genre,
+    total_movies,
+    film_actors,
+    movie_by_actor
+)
 from datetime import datetime
-from errors import YearError, GenreError
+from errors import YearError, GenreError, RatingError, ActorError
 
 class User:
     def __init__(self, db_object, mong_object):
@@ -24,16 +35,80 @@ class User:
             else:
                 print("No more movies found.")
 
+    @staticmethod
+    def print_names(all_names, key, key2="", line_length=6):
+        for i, name in enumerate(all_names, 1):
+            if not i % line_length:
+                print(name[key] + " " + name.get(key2, "") if key2 else name[key], end=",\n")
+            else:
+                print(name[key] + " " + name.get(key2, "") if key2 else name[key], end=', ')
+        print()
+
+    def find_movie_by_actor(self, pagination=10):
+        self.db.cursor.execute(film_actors)
+        all_actors = self.db.cursor.fetchall()
+        check_actors = {actor['first_name'] + " " + actor['last_name'] for actor in all_actors}
+        print("Please select below one of our famous, beloved actors :)")
+        self.print_names(all_actors, 'first_name', 'last_name', 7)
+        while True:
+            try:
+                first_name_actor = input("Enter actor's first name: ").strip().upper()
+                last_name_actor = input("Enter actor's last name: ").strip().upper()
+                if first_name_actor + " " + last_name_actor not in check_actors:
+                    raise ActorError('Please select existing actors only!!')
+                break
+            except ActorError as e:
+                print(e)
+        self.mymongo.insert_one({"timestamp": datetime.now(), "actor": first_name_actor + " " + last_name_actor})
+        self.db.cursor.execute(movie_by_actor, (first_name_actor, last_name_actor))
+        movies_found = self.db.cursor.fetchmany(pagination)
+        if movies_found:
+            self.print_found_movies(movies_found, pagination)
+        else:
+            print("No movie was found, we're sorry.")
+
+
+    def find_movie_by_rating_genre(self, pagination=10):
+        self.db.cursor.execute(film_genres)
+        all_genres = self.db.cursor.fetchall()
+        check_genres = {genre['name'] for genre in all_genres}
+        print("Available genres: ")
+        self.print_names(all_genres, 'name')
+        while True:
+            try:
+                which_genre = input("Enter preferred genre: ").lower().title()
+                if which_genre not in check_genres:
+                    raise GenreError('Please use indicated above genres only.')
+                break
+            except GenreError as e:
+                print(e)
+        self.db.cursor.execute(film_ratings)
+        all_ratings = self.db.cursor.fetchall()
+        check_rating = {rating['rating'] for rating in all_ratings}
+        print("Ratings: ")
+        self.print_names(all_ratings, 'rating')
+        while True:
+            try:
+                which_rating = input("Enter desired movie rating: ").upper()
+                if which_rating not in check_rating:
+                    raise RatingError('Please use indicated above ratings only.')
+                break
+            except RatingError as e:
+                print(e)
+        self.mymongo.insert_one({"timestamp": datetime.now(), "genre": which_genre, "rating": which_rating})
+        self.db.cursor.execute(movie_by_genre_and_rating, (which_genre, which_rating))
+        movies_found = self.db.cursor.fetchmany(pagination)
+        if movies_found:
+            self.print_found_movies(movies_found, pagination)
+        else:
+            print("No movie was found, we're sorry.")
+
     def find_movie_by_year_genre(self, pagination=10):
         self.db.cursor.execute(film_genres)
         all_genres = self.db.cursor.fetchall()
         check = {genre['name'] for genre in all_genres}
         print("Available genres: ")
-        for i, genre in enumerate(all_genres, 1):
-            if not i % 6:
-                print(genre['name'], end=",\n")
-            else:
-                print(genre['name'], end=', ')
+        self.print_names(all_genres, 'name')
         self.db.cursor.execute(min_max_years)
         years = self.db.cursor.fetchone()
         print(f"Min year in db: {years['min_year']}, Max year in db: {years['max_year']}")
@@ -85,59 +160,82 @@ class User:
         else:
             print("No movie was found, we're sorry.")
 
-    def show_top5_queries(self, by_title=False, by_genre = False):
-        choice = "title" if by_title else "genre" if by_genre else "popular years"
+    def show_top5_queries(self, by_title=False, by_genre = False, by_rating = False, by_actor = False):
+        choice = "title" if by_title else "genre" if by_genre else "rating" if by_rating else "actor"\
+            if by_actor else "popular years"
+        by_choice = choice
         top5 = self.mymongo.aggregate([{"$match": {choice: {"$ne": "", "$exists": True}}},
                                         {"$group": {"_id": f"${choice}", "count": {"$sum": 1}}},
                                         {"$project": {"_id": 0, choice: "$_id", "count": 1}},
                                         {"$sort": {"count": -1}}, {"$limit": 5}])
-        print(f"Top {choice}s: " if by_title or by_genre else f"Top {choice}: ",
+        print(f"Top {choice}s: " if by_choice != "popular years" else f"Top {choice}: ",
               *(f"{num}. {query[choice]} - {query['count']} times" for num, query in enumerate(top5, 1)), sep="\n")
 
     def last_unique_queries(self):
-        top10_unique = self.mymongo.aggregate([{"$match": {"title": {"$ne": ""}, "genre": {"$ne": ""}}},
-                                               {"$group": {"_id": {"title": "$title", "genre": "$genre"},
-                                                "timestamp": {"$max": "$timestamp"}}}, {"$sort": {"timestamp": -1}},
-                                               {"$project": {"_id": 0, "title": "$_id.title", "genre": "$_id.genre",
-                                                "timestamp": 1}}, {"$limit": 10}])
+        top10_unique = self.mymongo.aggregate(
+            [{"$match": {"title": {"$ne": ""}, "genre": {"$ne": ""}, "rating": {"$ne": ""}, "actor": {"$ne": ""}}},
+             {"$group": {"_id": {"title": "$title", "genre": "$genre", "rating": "$rating", "actor": "$actor"},
+                         "timestamp": {"$max": "$timestamp"}}}, {"$sort": {"timestamp": -1}},
+             {"$project": {"_id": 0, "title": "$_id.title", "genre": "$_id.genre", "rating": "$_id.rating",
+                           "actor": "$_id.actor", "timestamp": 1}}, {"$limit": 10}])
         print("Last 10 unique queries: ")
         for query in top10_unique:
-            print(f"Title: {query.get('title', "N/A")}, Genre: {query.get('genre', "N/A")}, Date: {query['timestamp']}")
+            print(f"Title: {query.get('title', 'N/A')}, Genre: {query.get('genre', 'N/A')},"
+                f" Main actor: {query.get('actor', 'N/A')}, Rating: {query.get('rating', 'N/A')},"
+                  f" Date: {query['timestamp']}")
 
     def how_many_movies_in_db(self):
         print("All available movies, divided by genre: ")
         self.db.cursor.execute(available_movies_per_genre)
         print(*(f"{movie['name']}: {movie['count']}" for movie in self.db.cursor), sep='\n')
+        print("-" * 14)
         self.db.cursor.execute(total_movies)
         total = self.db.cursor.fetchone()
         print(f"Total: {total['total']}")
 
 def get_menu(user):
     return {"title": "Main menu: ",
-                  "items": {
-                      "1": {"text": "Поиск фильма по жанру и диапазону годов выпуска",
-                            "action": user.find_movie_by_year_genre},
-                      "2": {"text": "Поиск фильма по названию",
-                            "action": user.find_movie_like},
-                      "3": {"text": "Most popular queries",
-                          "submenu": {"title": "Submenu: ",
-                                      "items": {
-                                          "1": {"text": "TOP5 Most popular movies",
-                                                "action": lambda: user.show_top5_queries(by_title=True)},
-                                          "2": {"text": "TOP5 Most popular genres",
-                                                "action": lambda: user.show_top5_queries(by_genre=True)},
-                                          "3": {"text": "TOP5 Most popular years",
-                                                "action": user.show_top5_queries},
-                                          "4": {"text": "Last unique queries",
-                                                "action": user.last_unique_queries},
-                                          "5": {"text": "Back to Main menu",
-                                                "action": 'back'}}
-                      }},
-                      "4": {"text": "Show me all available in DB movies",
-                            "action": user.how_many_movies_in_db},
-                      "5": {"text": "Exit",
-                            "action": lambda: print("Bye Bye :)") or sys.exit(0)}
-                  }}
+            "items": {
+                "1": {"text": "Find me movie",
+                      "submenu": {"title": "Find me movie:",
+                                  "items": {"1": {"text": "Find movie by genre and release year range",
+                                                  "action": user.find_movie_by_year_genre},
+                                            "2": {"text": "Find movie by genre and rating",
+                                                  "action": user.find_movie_by_rating_genre},
+                                            "3": {"text": "Find movie by title",
+                                                  "action": user.find_movie_like},
+                                            "4": {"text": "Find movie by actor",
+                                                  "action": user.find_movie_by_actor},
+                                            "5": {"text": "Back to Main menu",
+                                                  "action": 'back'}
+                                            }
+                                  }
+                      },
+                "2": {"text": "Most popular queries",
+                      "submenu": {"title": "Most popular queries: ",
+                                  "items": {
+                                      "1": {"text": "TOP5 Most popular movies",
+                                            "action": lambda: user.show_top5_queries(by_title=True)},
+                                      "2": {"text": "TOP5 Most popular genres",
+                                            "action": lambda: user.show_top5_queries(by_genre=True)},
+                                      "3": {"text": "TOP5 Most popular years",
+                                            "action": user.show_top5_queries},
+                                      "4": {"text": "TOP5 Rating",
+                                            "action": lambda: user.show_top5_queries(by_rating=True)},
+                                      "5": {"text": "TOP5 Actors",
+                                            "action": lambda: user.show_top5_queries(by_actor=True)},
+                                      "6": {"text": "Last unique queries",
+                                            "action": user.last_unique_queries},
+                                      "7": {"text": "Back to Main menu",
+                                            "action": 'back'}}
+                                  }
+                      },
+                "3": {"text": "Show me all available in DB movies",
+                      "action": user.how_many_movies_in_db},
+                "4": {"text": "Exit",
+                      "action": lambda: print("Bye Bye :)") or sys.exit(0)}
+                    }
+            }
 
 def ui_config(db_object, mong_object):
     user = User(db_object, mong_object)

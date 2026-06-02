@@ -4,3 +4,9 @@ class YearError(Exception):
 
 class GenreError(Exception):
     pass
+
+class RatingError(Exception):
+    pass
+
+class ActorError(Exception):
+    pass
