@@ -8,23 +8,23 @@ class User:
         self.db = db_object
         self.mymongo = mong_object.my_queries_db
 
-    def print_found_movies(self, movies_found):
+    def print_found_movies(self, movies_found, pagination=10):
         while movies_found:
             for movies in movies_found:
                 print(f"{movies['num']}. {movies['title']}, release year: {movies['release_year']},"
                       f" language: {movies['lang_name']}, genre: {movies['genre_name']}, duration:"
                       f" {movies['length']}m, rating: {movies['rating']}")
             length = len(movies_found)
-            if length < 10:
+            if length < pagination:
                 print(f"Last {length} movies have been shown" if length > 1 else "Last movie has been shown")
                 break
-            movies_found = self.db.cursor.fetchmany(10)
+            movies_found = self.db.cursor.fetchmany(pagination)
             if movies_found:
-                input("Press ENTER to show next 10 movies...")
+                input(f"Press ENTER to show next {pagination} movies...")
             else:
                 print("No more movies found.")
 
-    def find_movie_by_year_genre(self):
+    def find_movie_by_year_genre(self, pagination=10):
         self.db.cursor.execute(film_genres)
         all_genres = self.db.cursor.fetchall()
         check = {genre['name'] for genre in all_genres}
@@ -68,22 +68,20 @@ class User:
                 print(e)
         self.mymongo.insert_one({"timestamp": datetime.now(), "genre": which_genre, "popular years": f"{year_from}, {year_to}"})
         self.db.cursor.execute(movie_by_genre_and_year, (which_genre, year_from, year_to))
-        movies_found = self.db.cursor.fetchmany(10)
+        movies_found = self.db.cursor.fetchmany(pagination)
         if movies_found:
-            self.print_found_movies(movies_found)
-            return
+            self.print_found_movies(movies_found, pagination)
         else:
             print("No movie was found, we're sorry.")
-            return
 
-    def find_movie_like(self):
+    def find_movie_like(self, pagination=10):
         which_movie = input("Please enter any movie's title: ").lower()
         self.mymongo.insert_one({"timestamp": datetime.now(), "title": which_movie})
         self.db.cursor.execute(movies_like, (f"%{which_movie}%", which_movie, f"{which_movie} %", f"% {which_movie}",
                                             f"% {which_movie} %"))
-        movies_found = self.db.cursor.fetchmany(10)
+        movies_found = self.db.cursor.fetchmany(pagination)
         if movies_found:
-            self.print_found_movies(movies_found)
+            self.print_found_movies(movies_found, pagination)
         else:
             print("No movie was found, we're sorry.")
 
