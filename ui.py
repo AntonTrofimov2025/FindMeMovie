@@ -1,6 +1,7 @@
 import sys
 from sql import *
 from datetime import datetime
+from errors import YearError, GenreError
 
 class User:
     def __init__(self, db_object, mong_object):
@@ -25,8 +26,10 @@ class User:
 
     def find_movie_by_year_genre(self):
         self.db.cursor.execute(film_genres)
+        all_genres = self.db.cursor.fetchall()
+        check = {genre['name'] for genre in all_genres}
         print("Available genres: ")
-        for i, genre in enumerate(self.db.cursor, 1):
+        for i, genre in enumerate(all_genres, 1):
             if not i % 6:
                 print(genre['name'], end=",\n")
             else:
@@ -34,20 +37,35 @@ class User:
         self.db.cursor.execute(min_max_years)
         years = self.db.cursor.fetchone()
         print(f"Min year in db: {years['min_year']}, Max year in db: {years['max_year']}")
-        which_genre = input("Enter preferred genre: ").lower().title()
+        while True:
+            try:
+                which_genre = input("Enter preferred genre: ").lower().title()
+                if which_genre not in check:
+                    raise GenreError('Please use indicated above genres only.')
+                break
+            except GenreError as e:
+                print(e)
         print("Please enter release years below.")
         while True:
             try:
                 year_from = int(input("Starting from year: "))
+                if year_from < years['min_year']:
+                    raise YearError(f"Minimal year in DB: {years['min_year']}. Please try again.")
                 break
             except ValueError:
-                print("Use numbers only!!")
+                print("Use integer numbers only!!")
+            except YearError as e:
+                print(e)
         while True:
             try:
                 year_to = int(input("... to year (Inclusive): "))
+                if year_to > years['max_year']:
+                    raise YearError(f"Maximal year in DB: {years['max_year']}. Please try again.")
                 break
             except ValueError:
                 print("Use numbers only!!")
+            except YearError as e:
+                print(e)
         self.mymongo.insert_one({"timestamp": datetime.now(), "genre": which_genre, "popular years": f"{year_from}, {year_to}"})
         self.db.cursor.execute(movie_by_genre_and_year, (which_genre, year_from, year_to))
         movies_found = self.db.cursor.fetchmany(10)
@@ -66,10 +84,8 @@ class User:
         movies_found = self.db.cursor.fetchmany(10)
         if movies_found:
             self.print_found_movies(movies_found)
-            return
         else:
             print("No movie was found, we're sorry.")
-            return
 
     def show_top5_queries(self, by_title=False, by_genre = False):
         choice = "title" if by_title else "genre" if by_genre else "popular years"

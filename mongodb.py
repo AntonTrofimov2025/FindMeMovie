@@ -1,12 +1,13 @@
+import os
+
 from pymongo import MongoClient
+from dotenv import load_dotenv
+
+load_dotenv(".env")
 
 class MongoDB:
     def __init__(self):
-        self.__client = MongoClient(
-            "mongodb://ich_editor:verystrongpassword"
-            "@mongo.itcareerhub.de/?readPreference=primary"
-            "&ssl=false&authMechanism=DEFAULT&authSource=ich_edit"
-        )
+        self.__client = MongoClient(os.getenv("MONGO_DB"))
         self.__db = self.__client['ich_edit']
         self.__my_queries_db = self.__db['final_project_121225ptm_anton_t']
 
