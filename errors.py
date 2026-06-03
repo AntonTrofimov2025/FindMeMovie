@@ -10,3 +10,6 @@ class RatingError(Exception):
 
 class ActorError(Exception):
     pass
+
+class YearIndex(Exception):
+    pass

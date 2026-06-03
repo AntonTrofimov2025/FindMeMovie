@@ -1,4 +1,6 @@
 import sys
+from datetime import datetime
+
 from sql import (
     movies_like,
     movie_by_genre_and_year,
@@ -11,8 +13,7 @@ from sql import (
     film_actors,
     movie_by_actor
 )
-from datetime import datetime
-from errors import YearError, GenreError, RatingError, ActorError
+from errors import YearError, GenreError, RatingError, ActorError, YearIndex
 from movie_logging import logger_decorator
 
 class User:
@@ -80,7 +81,7 @@ class User:
         self.print_names(all_genres, 'name')
         while True:
             try:
-                which_genre = input("Enter preferred genre: ").lower().title()
+                which_genre = input("Enter preferred genre: ").strip().lower().title()
                 if which_genre not in check_genres:
                     raise GenreError('Please use indicated above genres only.')
                 break
@@ -119,7 +120,7 @@ class User:
         print(f"Min year in db: {years['min_year']}, Max year in db: {years['max_year']}")
         while True:
             try:
-                which_genre = input("Enter preferred genre: ").lower().title()
+                which_genre = input("Enter preferred genre: ").strip().lower().title()
                 if which_genre not in check:
                     raise GenreError('Please use indicated above genres only.')
                 break
@@ -131,22 +132,26 @@ class User:
                 year_from = int(input("Starting from year: "))
                 if year_from < years['min_year']:
                     raise YearError(f"Minimal year in DB: {years['min_year']}. Please try again.")
+                if year_from > years['max_year']:
+                    raise YearIndex(f"Start year cannot be greater than max year ({years['max_year']})."
+                                    f" Please try again.")
                 break
             except ValueError:
                 print("Use integer numbers only!!")
-            except YearError as e:
+            except (YearError, YearIndex) as e:
                 print(e)
         while True:
             try:
                 year_to = int(input("... to year (Inclusive): "))
                 if year_to > years['max_year']:
-                    raise YearError(f"Maximal year in DB: {years['max_year']}. Please try again.")
+                    raise YearError(f"Maximal year in DB: {years['max_year']}."
+                                    f" Please try again.")
                 if year_to < year_from:
-                    raise YearError(f"End year cannot be less than start year ({year_from}). Please try again.")
+                    raise YearIndex(f"End year cannot be less than start year ({year_from}). Please try again.")
                 break
             except ValueError:
                 print("Use integer numbers only!!")
-            except YearError as e:
+            except (YearError, YearIndex) as e:
                 print(e)
         self.mymongo.insert_one({"timestamp": datetime.now(), "genre": which_genre, "popular years": f"{year_from}, {year_to}"})
         self.db.cursor.execute(movie_by_genre_and_year, (which_genre, year_from, year_to))
@@ -158,7 +163,7 @@ class User:
 
     @logger_decorator
     def find_movie_like(self, pagination=10):
-        which_movie = input("Please enter any movie's title: ").lower()
+        which_movie = input("Please enter any movie's title: ").strip().lower()
         self.mymongo.insert_one({"timestamp": datetime.now(), "title": which_movie})
         self.db.cursor.execute(movies_like, (f"%{which_movie}%", which_movie, f"{which_movie} %", f"% {which_movie}",
                                             f"% {which_movie} %"))

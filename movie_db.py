@@ -14,8 +14,8 @@ class DB:
                          "database": os.environ.get("DB_DATABASE", "sakila"),
                          "cursorclass": DictCursor}
 
-        # self.__conn = None
-        # self.__cursor = None
+        self.__conn = None
+        self.__cursor = None
 
     @property
     def cursor(self):
