@@ -1,6 +1,14 @@
+# pylint: disable=line-too-long
 
+"""
+SQL Queries Catalog for the FindMeMovie Application.
 
-movies_like = """SELECT row_number() over () as num, 
+Contains parameterized SQL query strings for the Sakila database schema,
+including film filtering, full-text pattern matching, metrics aggregation,
+and metadata fetching.
+"""
+
+MOVIES_LIKE = """SELECT row_number() over () as num,
                      f.title, f.release_year, l.name as lang_name, c.name as genre_name, f.length, f.rating
                  FROM film f
                  JOIN film_category fc ON f.film_id = fc.film_id
@@ -15,7 +23,7 @@ movies_like = """SELECT row_number() over () as num,
                               END ASC,
                           f.title ASC;"""
 
-movie_by_genre_and_year = """SELECT row_number() over () as num, 
+MOVIE_BY_GENRE_AND_YEAR = """SELECT row_number() over () as num,
                      f.title, f.release_year, l.name as lang_name, c.name as genre_name, f.length, f.rating
                  FROM film f
                  JOIN film_category fc ON f.film_id = fc.film_id
@@ -24,7 +32,7 @@ movie_by_genre_and_year = """SELECT row_number() over () as num,
                  WHERE c.name = %s and f.release_year >= %s and f.release_year <= %s
                  ORDER BY f.title"""
 
-movie_by_genre_and_rating = """SELECT row_number() over () as num,
+MOVIE_BY_GENRE_AND_RATING = """SELECT row_number() over () as num,
                                       f.title,
                                       f.release_year,
                                       l.name               as lang_name,
@@ -38,7 +46,7 @@ movie_by_genre_and_rating = """SELECT row_number() over () as num,
                                WHERE c.name = %s
                                  AND f.rating = %s"""
 
-movie_by_actor = """SELECT row_number() over () as num,
+MOVIE_BY_ACTOR = """SELECT row_number() over () as num,
                                       f.title,
                                       f.release_year,
                                       l.name               as lang_name,
@@ -53,21 +61,21 @@ movie_by_actor = """SELECT row_number() over () as num,
                                         JOIN actor a ON fa.actor_id = a.actor_id
                                WHERE a.first_name = %s and a.last_name = %s"""
 
-film_genres = """SELECT name FROM category"""
+FILM_GENRES = """SELECT name FROM category"""
 
-film_ratings = """SELECT DISTINCT rating FROM film"""
+FILM_RATINGS = """SELECT DISTINCT rating FROM film"""
 
-min_max_years = "SELECT min(release_year) as min_year, max(release_year) as max_year from film"
+MIN_MAX_YEARS = "SELECT min(release_year) as min_year, max(release_year) as max_year from film"
 
-available_movies_per_genre = """SELECT c.name , count(c.name) as count FROM film f
+AVAILABLE_MOVIES_PER_GENRE = """SELECT c.name , count(c.name) as count FROM film f
                                 JOIN film_category fc ON f.film_id = fc.film_id
                                 JOIN category c ON fc.category_id = c.category_id
                                 GROUP BY c.name
                                 ORDER BY count(c.name) DESC"""
 
-total_movies = """SELECT count(film_id) as total FROM film"""
+TOTAL_MOVIES = """SELECT count(film_id) as total FROM film"""
 
-film_actors = """SELECT DISTINCT a.first_name, a.last_name
+FILM_ACTORS = """SELECT DISTINCT a.first_name, a.last_name
                  FROM film f
                           JOIN film_actor fa ON f.film_id = fa.film_id
                           JOIN actor a ON fa.actor_id = a.actor_id"""
