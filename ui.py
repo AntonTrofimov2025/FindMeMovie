@@ -133,12 +133,12 @@ class User:
                 if year_from < years['min_year']:
                     raise YearError(f"Minimal year in DB: {years['min_year']}. Please try again.")
                 if year_from > years['max_year']:
-                    raise YearIndex(f"Start year cannot be greater than max year ({years['max_year']})."
+                    raise YearError(f"Start year cannot be greater than max year ({years['max_year']})."
                                     f" Please try again.")
                 break
             except ValueError:
                 print("Use integer numbers only!!")
-            except (YearError, YearIndex) as e:
+            except YearError as e:
                 print(e)
         while True:
             try:
