@@ -144,13 +144,13 @@ class User:
         all_genres = self.db.cursor.fetchall()
         check_genres = {genre['name'] for genre in all_genres}
         print("Available genres: ")
-        self.print_names(all_genres, 'name')
+        User.print_names(all_genres, 'name')
         which_genre = User.genre_checker(check_genres)
         self.db.cursor.execute(FILM_RATINGS)
         all_ratings = self.db.cursor.fetchall()
         check_rating = {rating['rating'] for rating in all_ratings}
         print("Ratings: ")
-        self.print_names(all_ratings, 'rating')
+        User.print_names(all_ratings, 'rating')
         while True:
             try:
                 which_rating = input("Enter desired movie rating: ").strip().upper()
@@ -268,7 +268,7 @@ class User:
         all_genres = self.db.cursor.fetchall()
         check_genres = {genre['name'] for genre in all_genres}
         print("Available genres: ")
-        self.print_names(all_genres, 'name')
+        User.print_names(all_genres, 'name')
         self.db.cursor.execute(MIN_MAX_YEARS)
         years = self.db.cursor.fetchone()
         print(f"Min year in db: {years['min_year']}, Max year in db: {years['max_year']}")
